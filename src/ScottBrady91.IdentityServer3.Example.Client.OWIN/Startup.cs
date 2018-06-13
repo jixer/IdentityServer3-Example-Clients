@@ -17,8 +17,8 @@ namespace ScottBrady91.IdentityServer3.Example.Client.OWIN
 {
     public class Startup
     {
-        private const string ClientUri = @"https://localhost:44305/";
-        private const string IdServBaseUri = @"https://localhost:44300/core";
+        private const string ClientUri = @"http://localhost:4200";
+        private const string IdServBaseUri = @"http://localhost:50221";
         private const string UserInfoEndpoint = IdServBaseUri + @"/connect/userinfo";
         private const string TokenEndpoint = IdServBaseUri + @"/connect/token";
 
@@ -32,53 +32,19 @@ namespace ScottBrady91.IdentityServer3.Example.Client.OWIN
             app.UseOpenIdConnectAuthentication(
                 new OpenIdConnectAuthenticationOptions
                 {
-                    ClientId = "hybridclient",
+                    ClientId = "prepass-adminportal-dev",
                     Authority = IdServBaseUri,
-                    RedirectUri = ClientUri,
+                    RedirectUri = ClientUri + @"/login",                    
+                    ClientSecret = "K7gNU3sdo+OL0wNhqoVWhr3g6s1xYv72ol/pe/Unols=",
                     PostLogoutRedirectUri = ClientUri,
-                    ResponseType = "code id_token token",
-                    Scope = "openid profile email roles offline_access",
+                    ResponseType = "id_token token",
+                    Scope = "openid profile role api1 identity-user-management-api",
                     TokenValidationParameters = new TokenValidationParameters
                     {
                         NameClaimType = "name",
                         RoleClaimType = "role"
                     },
                     SignInAsAuthenticationType = "Cookies",
-                    Notifications =
-                        new OpenIdConnectAuthenticationNotifications
-                        {
-                            AuthorizationCodeReceived = async n =>
-                            {
-                                var userInfoClient = new UserInfoClient(new Uri(UserInfoEndpoint), n.ProtocolMessage.AccessToken);
-                                var userInfoResponse = await userInfoClient.GetAsync();
-
-                                var identity = new ClaimsIdentity(n.AuthenticationTicket.Identity.AuthenticationType);
-                                identity.AddClaims(userInfoResponse.GetClaimsIdentity().Claims);
-                               
-                                var tokenClient = new TokenClient(TokenEndpoint, "hybridclient", "idsrv3test");
-                                var response = await tokenClient.RequestAuthorizationCodeAsync(n.Code, n.RedirectUri);
-
-                                identity.AddClaim(new Claim("access_token", response.AccessToken));
-                                identity.AddClaim(
-                                    new Claim("expires_at", DateTime.UtcNow.AddSeconds(response.ExpiresIn).ToLocalTime().ToString(CultureInfo.InvariantCulture)));
-                                identity.AddClaim(new Claim("refresh_token", response.RefreshToken));
-                                identity.AddClaim(new Claim("id_token", n.ProtocolMessage.IdToken));
-
-                                n.AuthenticationTicket = new AuthenticationTicket(
-                                    identity, 
-                                    n.AuthenticationTicket.Properties);
-                            },
-                            RedirectToIdentityProvider = n =>
-                            {
-                                if (n.ProtocolMessage.RequestType == OpenIdConnectRequestType.LogoutRequest)
-                                {
-                                    var idTokenHint = n.OwinContext.Authentication.User.FindFirst("id_token").Value;
-                                    n.ProtocolMessage.IdTokenHint = idTokenHint;
-                                }
-
-                                return Task.FromResult(0);
-                            }
-                        }
                 });
         }
     }
